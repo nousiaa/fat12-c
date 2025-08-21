@@ -202,7 +202,7 @@ struct disk_params_t
 
 struct disk_info_t
 {
-    uint16_t *fat12_ptr;
+    uint8_t *fat12_ptr;
     struct dir_entry_t *root_dir_ptr;
     struct dir_entry_t *current_dir_ptr;
     uint32_t current_dir_entries_max;
@@ -218,9 +218,9 @@ struct file_info_t
     struct dir_entry_t root_entry;
 };
 
-uint16_t parse_fat12(uint16_t *fat12_ptr, uint16_t cluster)
+uint16_t parse_fat12(uint8_t *fat12_ptr, uint16_t cluster)
 {
-    return *(fat12_ptr + (cluster + (cluster / 2))) >> (cluster & 1) * 4 & 0xFFF;
+    return *(uint16_t *)(fat12_ptr + (cluster + (cluster / 2))) >> (cluster & 1) * 4 & 0xFFF;
 }
 
 char* int_to_dec_str(uint32_t value){
@@ -404,7 +404,6 @@ void load_fat12(struct disk_info_t *disk_info)
 struct dir_entry_t *select_file(struct disk_info_t *disk_info, uint8_t *filename)
 {
     uint16_t dirEntryIndex, filenameCharIndex, extCharIndex;
-    uint8_t foundExt = 0;
     uint8_t filenameTmp[8] = "        ";
     uint8_t extTmp[3];
     copy_mem(extTmp, (char *)DEFAULT_EXT, 3);
@@ -415,19 +414,15 @@ struct dir_entry_t *select_file(struct disk_info_t *disk_info, uint8_t *filename
             break;
         }
         if(filename[filenameCharIndex] == '.') {
-            foundExt = 1;
             filenameCharIndex++;
+            for (extCharIndex=0; extCharIndex < 3; extCharIndex++)
+            {
+                if (filename[extCharIndex + filenameCharIndex] == ' ' || filename[extCharIndex + filenameCharIndex] == '\0') break;
+                extTmp[extCharIndex] = char2upper(filename[extCharIndex + filenameCharIndex]);
+            }
             break; 
         }
         filenameTmp[filenameCharIndex] = char2upper(filename[filenameCharIndex]);
-    }
-    if(foundExt){
-
-        for (extCharIndex=0; extCharIndex < 3; extCharIndex++)
-        {
-            if (filename[extCharIndex + filenameCharIndex] == ' ' || filename[extCharIndex + filenameCharIndex] == '\0') break;
-            extTmp[extCharIndex] = char2upper(filename[extCharIndex + filenameCharIndex]);
-        }
     }
 
 
