@@ -350,7 +350,7 @@ void print_file(struct file_info_t *file)
     uint32_t printIter = 0;
     print_str("\nFilename: ");
     print_strn(file->root_entry.name, 11);
-    print_str("\nFile content: \n");
+    print_str("\nContent: \n");
     
     for (printIter = 0; printIter < file->root_entry.file_size; printIter++)
     {
@@ -512,7 +512,7 @@ void handleFile(struct disk_info_t *disk_info, int argc, char *argv[])
         if (selectedFile != NULL){
             file = load_file(disk_info, selectedFile);
             if(file.data.data == NULL && file.data.far_data == NULL) {
-                print_str("Failed to load file data.\n");
+                print_str("FLoad ERR\n");
                 return;
             }
             if(is_dir(selectedFile)){
