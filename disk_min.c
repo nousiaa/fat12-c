@@ -243,14 +243,13 @@ void print_dir(struct disk_info_t *disk_info)
     struct dir_entry_t *dirToLookAt = disk_info->current_dir_ptr;
     uint16_t total_files = 0, total_dirs = 0;
     uint32_t total_bytes = 0;
-    print_str("Directory listing:\n");
     print_str("Serial:");
     print_str(int_to_dec_str(disk_info->param_block.serial));
     print_str(" Label: ");
     print_strn(disk_info->param_block.label, 11);
     print_str("\n\n");
 
-    print_str("Name\tExt\tSize\tCreated\t\tAttributes\n");
+    print_str("Name\tExt\tSize\tCreated\t\tAttr\n");
     for(dir_print_index = 0; dir_print_index < dirEntries; dir_print_index++)
     {
         if(dirToLookAt[dir_print_index].name[0] == 0 || dirToLookAt[dir_print_index].start_cluster == 0) continue; // skip empty entries
@@ -285,7 +284,7 @@ void print_dir(struct disk_info_t *disk_info)
 
     print_str("\nFiles: ");
     print_str(int_to_dec_str(total_files));
-    print_str(", total size: ");
+    print_str(", size: ");
     print_str(int_to_dec_str(total_bytes));
     print_str(" bytes\n");
     print_str("Dirs: ");
@@ -320,7 +319,7 @@ struct file_info_t load_file(struct disk_info_t *disk_info, struct dir_entry_t *
     if (!file_info.data.data) {
         file_info.data.far_data = _fmalloc(file_info.malloc_size);
         if (!file_info.data.far_data) {
-            print_str("Failed to allocate memory for file data");
+            print_str("Failed malloc");
             return file_info;
         }
     }
@@ -349,7 +348,7 @@ struct file_info_t load_file(struct disk_info_t *disk_info, struct dir_entry_t *
 void print_file(struct file_info_t *file)
 {
     uint32_t printIter = 0;
-    print_str("\nFile name: ");
+    print_str("\nFilename: ");
     print_strn(file->root_entry.name, 11);
     print_str("\nFile content: \n");
     
@@ -457,7 +456,7 @@ struct disk_info_t load_disk_info(uint8_t drive_number)
     disk_info.fat12_ptr = NULL;
     disk_info.root_dir_ptr = NULL;
     if(!is_fat12(&disk_info)) {
-        print_str("Not a FAT12 filesystem.");
+        print_str("Not FAT12");
         return disk_info;
     }
     load_fat12(&disk_info);
@@ -496,7 +495,7 @@ uint8_t is_dir(struct dir_entry_t *entry)
 uint8_t setCurrentDir(struct disk_info_t *disk_info, struct file_info_t *file)
 {
     if(file->data.data == NULL) {
-        print_str("Directory loaded to far memory, not implemented");
+        print_str("Dir in __FAR err");
         return 0;
     }
     disk_info->current_dir_ptr = (struct dir_entry_t *) file->data.data; // we just hope its not in far memory :D
