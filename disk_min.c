@@ -41,7 +41,6 @@ void copy_mem(void* dest, void* src, size_t size)
     }
 }
 
-
 int8_t str_n_compare(uint8_t *str1, uint8_t *str2, uint8_t strLim)
 {
     uint8_t strIndex;
@@ -203,7 +202,7 @@ struct disk_params_t
 
 struct disk_info_t
 {
-    uint8_t *fat12_ptr;
+    uint16_t *fat12_ptr;
     struct dir_entry_t *root_dir_ptr;
     struct dir_entry_t *current_dir_ptr;
     uint32_t current_dir_entries_max;
@@ -219,13 +218,13 @@ struct file_info_t
     struct dir_entry_t root_entry;
 };
 
-uint16_t parse_fat12(uint8_t *fat12_ptr, uint16_t cluster)
+uint16_t parse_fat12(uint16_t *fat12_ptr, uint16_t cluster)
 {
-    return *(uint16_t *)(fat12_ptr + (cluster + (cluster / 2))) >> (cluster & 1) * 4 & 0xFFF;
+    return *(fat12_ptr + (cluster + (cluster / 2))) >> (cluster & 1) * 4 & 0xFFF;
 }
 
 char* int_to_dec_str(uint32_t value){
-    static char buf[12];
+    static uint8_t buf[12];
     char *ptr = buf + sizeof(buf) - 1;
 
     *ptr = '\0';
@@ -251,7 +250,7 @@ void print_dir(struct disk_info_t *disk_info)
     print_strn(disk_info->param_block.label, 11);
     print_str("\n\n");
 
-    print_str("Name\tExt\tSize\tCreated\t\t\tAttributes\n");
+    print_str("Name\tExt\tSize\tCreated\t\tAttributes\n");
     for(dir_print_index = 0; dir_print_index < dirEntries; dir_print_index++)
     {
         if(dirToLookAt[dir_print_index].name[0] == 0 || dirToLookAt[dir_print_index].start_cluster == 0) continue; // skip empty entries
@@ -448,7 +447,6 @@ struct dir_entry_t *select_file(struct disk_info_t *disk_info, uint8_t *filename
     }
     return NULL;
 }
-
 
 uint8_t is_fat12(struct disk_info_t *disk_info)
 {
