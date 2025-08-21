@@ -9,18 +9,14 @@ typedef unsigned char uint8_t;
 typedef unsigned int uint16_t;
 typedef unsigned long uint32_t;
 
-// Default file extension
 const uint8_t DEFAULT_EXT[4] = "TXT";
 
-// Consts for drive numbers
 const uint8_t DRIVE_A = 0;
 const uint8_t DRIVE_B = 1;
 
-// Custom drive attributes
 const uint8_t DRIVE_ATTR_RESET = 1;
 const uint8_t DRIVE_ATTR_NONE = 0;
 
-// File attributes
 const uint8_t FILE_READ_ONLY = 0x01;
 const uint8_t FILE_HIDDEN = 0x02;
 const uint8_t FILE_SYSTEM = 0x04;
@@ -62,9 +58,9 @@ uint8_t char2upper(uint8_t c)
 
 void print_char(uint8_t c) {
     union REGS inregs,outregs;
-    inregs.h.ah = 0x0e; // BIOS teletype output function
-    inregs.h.bh = 0; // Page number (0 for default)
-    inregs.h.al = c; // Character to print
+    inregs.h.ah = 0x0e; // BIOS teletype
+    inregs.h.bh = 0; // Page (0 default)
+    inregs.h.al = c;
     int86(0x10, &inregs, &outregs);
 }
 
@@ -85,12 +81,11 @@ void print_str(char* message) {
 void reset_drive(uint8_t drive)
 {
     union REGS inregs,outregs;
-    inregs.h.ah = 0x00; // BIOS reset function
+    inregs.h.ah = 0x00; // reset 
     inregs.h.dl = drive;
     int86(0x13, &inregs, &outregs);
 }
 
-/* Convert LBA (Logical Block Addressing) to CHS (Cylinder-Head-Sector) */
 void lba_chs(uint32_t lba, uint8_t SECTORS_PER_TRACK, uint8_t HEADS, uint16_t* cyl, uint16_t* head, uint16_t* sector)
 {
     *cyl    = lba / (HEADS * SECTORS_PER_TRACK);
@@ -101,14 +96,13 @@ void lba_chs(uint32_t lba, uint8_t SECTORS_PER_TRACK, uint8_t HEADS, uint16_t* c
 void get_drive_params(uint8_t drive, uint8_t* sectors, uint8_t* heads)
 {
     union REGS inregs,outregs;
-    inregs.h.ah = 0x08; // BIOS get drive parameters function
+    inregs.h.ah = 0x08; // Get drive parameters
     inregs.h.dl = drive;
     int86(0x13, &inregs, &outregs);
     *sectors = outregs.h.cl & 0x3f;
     *heads = outregs.h.dh + 1;
 }
 
-// Adjust segment and return minimum possible offset to avoid any boundary issues
 uint16_t adjust_segment_min_offset(struct SREGS *segregs, uint16_t data_address)
 {
     segregs->es += data_address >> 4;
@@ -136,8 +130,8 @@ void get_data_from_disk(uint32_t lba, uint8_t size, struct data_target_t* dataSt
     }
     offset = adjust_segment_min_offset(&segregs, offset);
 
-    inregs.h.ah = 0x02; // BIOS read sector function
-    inregs.h.al = size; // Number of sectors to read
+    inregs.h.ah = 0x02; // Read sectors
+    inregs.h.al = size; // num of sectors
     inregs.h.ch = cyl;
     inregs.h.cl = sector;
     inregs.h.dh = head;
@@ -147,28 +141,27 @@ void get_data_from_disk(uint32_t lba, uint8_t size, struct data_target_t* dataSt
     int86x(0x13, &inregs, &outregs, &segregs);
 }
 
-// Structure for the BIOS Parameter Block (BPB)
 // no padding for load purposes
 _Packed struct param_block_t
 {
-    uint8_t jmp[3]; // Jump instruction to boot code
+    uint8_t jmp[3];
     uint8_t oem[8];
-    uint16_t bytes_per_sector; //2b
-    uint8_t sectors_per_cluster; //1b
-    uint16_t reserved_sectors; //2b
-    uint8_t fat_count; //1b
-    uint16_t root_dir_entries; //2b
-    uint16_t total_sectors; //2b
-    uint8_t media_type; //1b
-    uint16_t fat_size; //2b
-    uint16_t sectors_per_track; //2b
-    uint16_t head_count; //2b
-    uint32_t hidden_sectors; //4b
-    uint32_t total_sectors_large; //4b
+    uint16_t bytes_per_sector;
+    uint8_t sectors_per_cluster;
+    uint16_t reserved_sectors;
+    uint8_t fat_count;
+    uint16_t root_dir_entries;
+    uint16_t total_sectors;
+    uint8_t media_type;
+    uint16_t fat_size;
+    uint16_t sectors_per_track;
+    uint16_t head_count;
+    uint32_t hidden_sectors;
+    uint32_t total_sectors_large;
     uint8_t drive_num;
     uint8_t flags_nt;
     uint8_t signature;
-    uint32_t serial; //4b
+    uint32_t serial;
     uint8_t label[11];
     uint8_t fs_type[8];
     uint8_t bootcode[448];
@@ -308,7 +301,7 @@ struct file_info_t load_file(struct disk_info_t *disk_info, struct dir_entry_t *
     copy_mem(&file_info.root_entry, selectedFile, sizeof(struct dir_entry_t));
 
 
-    // get size from fat as we cant trust size in root entry for directory entries
+    // get size from fat
     currentCluster = selectedFile->start_cluster;
     while (currentCluster != 0xFFF && currentCluster != 0x000)
     {
@@ -327,7 +320,7 @@ struct file_info_t load_file(struct disk_info_t *disk_info, struct dir_entry_t *
         }
     }
 
-    // then actually read the data
+    // Actually read the data
     file_offset = 0;
     currentCluster = selectedFile->start_cluster;
     while (currentCluster != 0xFFF && currentCluster != 0x000)
