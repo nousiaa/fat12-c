@@ -1,0 +1,1 @@
+wcl -lr -mt disk.c
