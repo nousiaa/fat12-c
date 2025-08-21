@@ -55,10 +55,7 @@ int8_t str_n_compare(uint8_t *str1, uint8_t *str2, uint8_t strLim)
 
 uint8_t char2upper(uint8_t c)
 {
-    if (c >= 'a' && c <= 'z') {
-        return c - 32;
-    }
-    return c;
+    return c-" "[c<97|c>122];
 }
 
 void print_char(uint8_t c) {
@@ -68,9 +65,9 @@ void print_char(uint8_t c) {
     inregs.h.al = c; // Character to print
     int86(0x10, &inregs, &outregs);
 }
+
 void print_strn(char* message, uint32_t lim)
 {
-
     uint32_t charIndex;
 
     for (charIndex = 0; message[charIndex] != '\0' && charIndex < lim; charIndex++) {
@@ -224,11 +221,7 @@ struct file_info_t
 
 uint16_t parse_fat12(uint8_t *fat12_ptr, uint16_t cluster)
 {
-    uint32_t fat_entry = *(uint32_t *)(fat12_ptr + (cluster + (cluster / 2)));
-    if (cluster & 1) fat_entry >>= 4;
-    fat_entry &= 0xFFF;
-
-    return fat_entry;
+    return *(uint16_t *)(fat12_ptr + (cluster + (cluster / 2))) >> (cluster & 1) * 4 & 0xFFF;
 }
 
 char* int_to_dec_str(uint32_t value){
