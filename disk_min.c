@@ -3,8 +3,11 @@
  */
 
 #include <i86.h>
-#include <stdint.h>
 #include <malloc.h>
+
+typedef unsigned char uint8_t;
+typedef unsigned int uint16_t;
+typedef unsigned long uint32_t;
 
 // Default file extension
 const uint8_t DEFAULT_EXT[4] = "TXT";
@@ -41,7 +44,7 @@ void copy_mem(void* dest, void* src, size_t size)
     }
 }
 
-int8_t str_n_compare(uint8_t *str1, uint8_t *str2, uint8_t strLim)
+uint8_t str_n_compare(uint8_t *str1, uint8_t *str2, uint8_t strLim)
 {
     uint8_t strIndex;
     for (strIndex = 0; strIndex < strLim; strIndex++) {
