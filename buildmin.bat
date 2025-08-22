@@ -1,1 +1,0 @@
-wcl -lr -mt disk_min.c

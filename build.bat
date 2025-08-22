@@ -1,1 +1,1 @@
-wcl -lr -mt disk.c
+wcl -lr -mt prog.c

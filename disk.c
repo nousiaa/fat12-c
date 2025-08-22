@@ -545,10 +545,3 @@ void handleFile(struct disk_info_t *disk_info, int argc, char *argv[])
     }
 
 }
-
-void main(int argc, char *argv[])
-{
-    struct disk_info_t disk_info = load_disk_info(DRIVE_A);
-    handleFile(&disk_info, argc, argv);
-    unload_disk_info(&disk_info);
-}
