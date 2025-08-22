@@ -535,12 +535,12 @@ void unload_file(struct file_info_t *file)
     file->data.data = NULL;
 }
 
-uint8_t isDir(struct dir_entry_t *entry)
+uint8_t is_dir(struct dir_entry_t *entry)
 {
     return (entry->attr & FILE_DIRECTORY) != 0;
 }
 
-void setCurrentDir(struct disk_info_t *disk_info, struct file_info_t *file)
+void set_current_dir(struct disk_info_t *disk_info, struct file_info_t *file)
 {
     if(file->data.data == NULL) {
         perror("Directory loaded to far memory, not implemented");
@@ -550,7 +550,7 @@ void setCurrentDir(struct disk_info_t *disk_info, struct file_info_t *file)
     disk_info->current_dir_entries_max = file->malloc_size / sizeof(struct dir_entry_t);
 }
 
-void handleFile(struct disk_info_t *disk_info, int argc, char *argv[])
+void handle_file(struct disk_info_t *disk_info, int argc, char *argv[])
 {
     struct file_info_t file;
     struct dir_entry_t *selectedFile;
@@ -558,9 +558,9 @@ void handleFile(struct disk_info_t *disk_info, int argc, char *argv[])
         selectedFile = select_file(disk_info, argv[1]);
         if (selectedFile != NULL){
             file = load_file(disk_info, selectedFile);
-            if(isDir(selectedFile)){
-                setCurrentDir(disk_info, &file);
-                handleFile(disk_info, argc - 1, argv + 1);
+            if(is_dir(selectedFile)){
+                set_current_dir(disk_info, &file);
+                handle_file(disk_info, argc - 1, argv + 1);
             } else {
                 print_file(&file);
             }

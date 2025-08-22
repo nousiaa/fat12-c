@@ -7,7 +7,7 @@ void main(int argc, char *argv[])
     if (disk_info.fat12_ptr == NULL) {
         return;
     }
-    handleFile(&disk_info, argc, argv);
+    handle_file(&disk_info, argc, argv);
     unload_disk_info(&disk_info);
 
     return;

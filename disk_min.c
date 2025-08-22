@@ -506,7 +506,7 @@ uint8_t is_dir(struct dir_entry_t *entry)
     return (entry->attr & FILE_DIRECTORY) != 0;
 }
 
-uint8_t setCurrentDir(struct disk_info_t *disk_info, struct file_info_t *file)
+uint8_t set_current_dir(struct disk_info_t *disk_info, struct file_info_t *file)
 {
     if(file->data.data == NULL) {
         print_str("Dir in __FAR err");
@@ -517,7 +517,7 @@ uint8_t setCurrentDir(struct disk_info_t *disk_info, struct file_info_t *file)
     return 1;
 }
 
-void handleFile(struct disk_info_t *disk_info, int argc, char *argv[])
+void handle_file(struct disk_info_t *disk_info, int argc, char *argv[])
 {
     struct file_info_t file;
     struct dir_entry_t *selectedFile;
@@ -530,10 +530,10 @@ void handleFile(struct disk_info_t *disk_info, int argc, char *argv[])
                 return;
             }
             if(is_dir(selectedFile)){
-                if (!setCurrentDir(disk_info, &file)){
+                if (!set_current_dir(disk_info, &file)){
                     return;
                 }
-                handleFile(disk_info, argc - 1, argv + 1);
+                handle_file(disk_info, argc - 1, argv + 1);
             } else {
                 print_file(&file);
             }
