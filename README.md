@@ -11,5 +11,5 @@ example: prog afolder anotherfolder readme.txt
 
 BUILD WITH openwatcom v2
 ```
-wcl -lr -mt disk.c
+wcl -lr -mt prog.c
 ```

@@ -6,7 +6,7 @@
  *  usage: prog 0-n<folder> 0-1<file>
  *  example: prog afolder anotherfolder readme.txt
  * 
- *  BUILD WITH openwatcom v2 - "wcl -lr -mt disk.c"
+ *  BUILD WITH openwatcom v2 - "wcl -lr -mt prog.c"
  *  NOTE: compiling with tiny memory mode fails when allocating memory for file data where data+code>64K
  *  NOTE2: did some far pointer fuckery to allow more memory to be allocated for file data
  */
