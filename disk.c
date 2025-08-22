@@ -18,6 +18,8 @@
 #include <string.h>
 #include <malloc.h>
 
+const uint32_t MAX_FAR_MALLOC_SIZE = 0xFFFF - 512;
+
 // Debugging flag
 const uint8_t DEBUG = 0;
 
@@ -40,11 +42,16 @@ const uint8_t FILE_VOLUME_ID = 0x08;
 const uint8_t FILE_DIRECTORY = 0x10;
 const uint8_t FILE_ARCHIVE = 0x20;
 
-struct data_target_t
+struct far_data_list_t
 {
     void __far *far_data;
-    void *data;
+    uint16_t data_size;
+};
 
+struct data_target_t
+{
+    struct far_data_list_t far_data_list[10]; // YES, limited, but should be enough for most cases
+    void *data;
 };
 
 uint8_t char2upper(uint8_t c)
@@ -107,7 +114,7 @@ uint16_t adjust_segment_min_offset(struct SREGS *segregs, uint16_t data_address)
     return data_address & 0xF;
 }
 
-void get_data_from_disk(uint32_t lba, uint8_t size, struct data_target_t* dataStruct, uint8_t attributes, uint8_t drive_number)
+void get_data_from_disk(uint32_t lba, uint8_t size, void __far *data, uint8_t attributes, uint8_t drive_number)
 {
     uint16_t offset;
     union REGS inregs,outregs;
@@ -119,13 +126,8 @@ void get_data_from_disk(uint32_t lba, uint8_t size, struct data_target_t* dataSt
 
     lba_chs(lba, sectors_count, heads_count, &cyl, &head, &sector);
     segread( &segregs );
-    if(dataStruct->data == NULL) {
-        offset = FP_OFF(dataStruct->far_data); // Use far pointer if data is NULL
-        segregs.es = FP_SEG(dataStruct->far_data);
-    } else {
-        offset = (uint16_t)dataStruct->data;
-        segregs.es = segregs.ds;
-    }
+    offset = FP_OFF(data);
+    segregs.es = FP_SEG(data);
     offset = adjust_segment_min_offset(&segregs, offset);
     if (DEBUG) {
         printf("LBA: %u\n", lba);
@@ -282,15 +284,26 @@ void print_dir(struct disk_info_t *disk_info)
     printf("Dirs: %d\n", total_dirs);
 }
 
+struct data_target_t  init_datastruct() {
+    struct data_target_t dataStruct;
+    uint8_t i;
+    dataStruct.data = NULL;
+    for(i=0; i<10; i++) {
+        dataStruct.far_data_list[i].far_data = NULL;
+        dataStruct.far_data_list[i].data_size = 0;
+    }
+    return dataStruct;
+}
+
 struct file_info_t load_file(struct disk_info_t *disk_info, struct dir_entry_t *selectedFile)
 {
     struct file_info_t file_info;
-    uint16_t currentCluster = 0, file_offset = 0;
-    uint32_t printIter = 0;
+    uint32_t currentCluster = 0, file_offset = 0;
     uint32_t lbaTmp;
-    uint16_t dataTmp;
-    struct data_target_t dataStruct;
-    dataStruct.far_data = NULL;
+    uint32_t dataTmp;
+    uint32_t segmentCount = 0, lastSegmentSize = 0;
+    struct data_target_t dataStruct = init_datastruct();
+    file_info.data = init_datastruct();
     dataStruct.data = NULL;
     memcpy(&file_info.root_entry, selectedFile, sizeof(struct dir_entry_t));
 
@@ -305,10 +318,32 @@ struct file_info_t load_file(struct disk_info_t *disk_info, struct dir_entry_t *
     }
 
     file_info.malloc_size = file_offset * disk_info->param_block.sectors_per_cluster * disk_info->param_block.bytes_per_sector;
-    file_info.data.data = malloc(file_info.malloc_size);
+
+    if(DEBUG){
+        printf("would malloc %lu bytes\n", file_info.malloc_size);
+        printf("needs to be split in %lu parts\n",(file_info.malloc_size/MAX_FAR_MALLOC_SIZE)+1);
+        printf("with last part %lu bytes\n", file_info.malloc_size % MAX_FAR_MALLOC_SIZE);
+    }
+
+    if(file_info.malloc_size < MAX_FAR_MALLOC_SIZE) {
+        file_info.data.data = malloc(file_info.malloc_size); 
+        file_info.data.far_data_list[0].far_data = (uint8_t __far *)file_info.data.data;
+        file_info.data.far_data_list[0].data_size = file_info.malloc_size;
+    }
     if (!file_info.data.data) {
-        file_info.data.far_data = _fmalloc(file_info.malloc_size);
-        if (!file_info.data.far_data) {
+        for(segmentCount = 0; segmentCount < (file_info.malloc_size/MAX_FAR_MALLOC_SIZE); segmentCount++) {
+            file_info.data.far_data_list[segmentCount].far_data = _fmalloc(MAX_FAR_MALLOC_SIZE);
+            file_info.data.far_data_list[segmentCount].data_size = MAX_FAR_MALLOC_SIZE;
+            if (!file_info.data.far_data_list[segmentCount].far_data) {
+                perror("Failed to allocate memory for file data");
+                exit(EXIT_FAILURE);
+            }
+        }
+
+        file_info.data.far_data_list[segmentCount].far_data = _fmalloc(file_info.malloc_size % MAX_FAR_MALLOC_SIZE);
+        file_info.data.far_data_list[segmentCount].data_size = file_info.malloc_size % MAX_FAR_MALLOC_SIZE;
+
+        if (!file_info.data.far_data_list[segmentCount].far_data) {
             perror("Failed to allocate memory for file data");
             exit(EXIT_FAILURE);
         }
@@ -333,13 +368,11 @@ struct file_info_t load_file(struct disk_info_t *disk_info, struct dir_entry_t *
         lbaTmp = disk_info->disk_params.start_of_data_sector + (currentCluster-disk_info->disk_params.FAT_CLUSTER_OFFSET) * disk_info->param_block.sectors_per_cluster;
         
         dataTmp = (file_offset * disk_info->param_block.bytes_per_sector * disk_info->param_block.sectors_per_cluster);
-        if (file_info.data.data) {
-            dataStruct.data = (uint8_t *)file_info.data.data + dataTmp;
-        } else {
-            dataStruct.far_data = (uint8_t __far *)file_info.data.far_data + dataTmp;
-        }
 
-        get_data_from_disk(lbaTmp, disk_info->param_block.sectors_per_cluster, &dataStruct, DRIVE_ATTR_NONE, disk_info->drive_number);
+        dataStruct.far_data_list[dataTmp / MAX_FAR_MALLOC_SIZE].far_data = (uint8_t __far *)file_info.data.far_data_list[dataTmp / MAX_FAR_MALLOC_SIZE].far_data+ dataTmp % MAX_FAR_MALLOC_SIZE;
+        dataStruct.far_data_list[dataTmp / MAX_FAR_MALLOC_SIZE].data_size = file_info.data.far_data_list[dataTmp / MAX_FAR_MALLOC_SIZE].data_size;
+
+        get_data_from_disk(lbaTmp, disk_info->param_block.sectors_per_cluster, dataStruct.far_data_list[dataTmp / MAX_FAR_MALLOC_SIZE].far_data, DRIVE_ATTR_NONE, disk_info->drive_number);
         currentCluster = parse_fat12(disk_info->fat12_ptr, currentCluster);
         file_offset++;
     }
@@ -356,7 +389,7 @@ void print_file(struct file_info_t *file)
     printf("File content: \n");
     for (printIter = 0; printIter < file->root_entry.file_size; printIter++)
     {
-        printf("%c", file->data.data ? ((uint8_t *)file->data.data)[printIter] : ((uint8_t __far *)file->data.far_data)[printIter]);
+        printf("%c",((uint8_t __far *)file->data.far_data_list[printIter / MAX_FAR_MALLOC_SIZE].far_data)[printIter % MAX_FAR_MALLOC_SIZE]);
     }
     printf("\n");
 }
@@ -374,35 +407,24 @@ void init_disk_params(struct disk_info_t *disk_info)
 
 void load_bios_param_block(struct disk_info_t *disk_info)
 {
-    struct data_target_t dataStruct;
-    dataStruct.far_data = NULL;
-    dataStruct.data = &disk_info->param_block;
-    get_data_from_disk(0, 1, &dataStruct, DRIVE_ATTR_RESET, disk_info->drive_number);
+    get_data_from_disk(0, 1, (uint8_t __far *)&disk_info->param_block, DRIVE_ATTR_RESET, disk_info->drive_number);
 }
 
 void load_root_dir(struct disk_info_t *disk_info)
 {
-    struct data_target_t dataStruct;
-    dataStruct.far_data = NULL;
-    
     disk_info->root_dir_ptr = malloc(disk_info->disk_params.root_dir_size);
-    dataStruct.data = disk_info->root_dir_ptr;
     disk_info->current_dir_ptr = disk_info->root_dir_ptr; // Set root as current directory
     disk_info->current_dir_entries_max = disk_info->param_block.root_dir_entries;
-    get_data_from_disk(disk_info->disk_params.start_of_root_dir, disk_info->disk_params.root_dir_sectors, &dataStruct, DRIVE_ATTR_NONE, disk_info->drive_number);
+    get_data_from_disk(disk_info->disk_params.start_of_root_dir, disk_info->disk_params.root_dir_sectors, (uint8_t __far *)disk_info->root_dir_ptr, DRIVE_ATTR_NONE, disk_info->drive_number);
 }
 
 void load_fat12(struct disk_info_t *disk_info)
 {
-    struct data_target_t dataStruct;
-    dataStruct.far_data = NULL;
     disk_info->fat12_ptr = malloc(disk_info->disk_params.fat12_size_bytes/2);
-
-    dataStruct.data = disk_info->fat12_ptr;
     if (DEBUG) {
         printf("FAT12 size: %d bytes sectors %d\n", disk_info->disk_params.fat12_size_bytes, disk_info->disk_params.fat12_size_sectors);
     }
-    get_data_from_disk(disk_info->param_block.reserved_sectors, disk_info->disk_params.fat12_size_sectors/2, &dataStruct, DRIVE_ATTR_NONE, disk_info->drive_number);
+    get_data_from_disk(disk_info->param_block.reserved_sectors, disk_info->disk_params.fat12_size_sectors/2, (uint8_t __far *)disk_info->fat12_ptr, DRIVE_ATTR_NONE, disk_info->drive_number);
 }
 
 struct dir_entry_t *select_file(struct disk_info_t *disk_info, uint8_t *filename)
@@ -497,14 +519,20 @@ void unload_disk_info(struct disk_info_t *disk_info)
 
 void unload_file(struct file_info_t *file)
 {
+    uint8_t far_data_index;
     if (file->data.data != NULL) {
         free(file->data.data);
-    } 
-    if (file->data.far_data != NULL) {
-        _ffree(file->data.far_data);
+        file->data.far_data_list[0].far_data = NULL;
+        file->data.far_data_list[0].data_size = 0;
+    }
+    for(far_data_index=0; far_data_index<10; far_data_index++) {
+        if (file->data.far_data_list[far_data_index].far_data != NULL) {
+            _ffree(file->data.far_data_list[far_data_index].far_data);
+            file->data.far_data_list[far_data_index].far_data = NULL;
+        }
+        file->data.far_data_list[far_data_index].data_size = 0;
     }
     file->data.data = NULL;
-    file->data.far_data = NULL;
 }
 
 uint8_t isDir(struct dir_entry_t *entry)
