@@ -15,3 +15,10 @@ BUILD WITH openwatcom v2
 ```
 wcl -lr -mt prog.c
 ```
+
+The program only looks at the first floppy drive (A:)
+
+can be used in dosbox with an mounted floppy image
+```
+z:\imgmount A <image_file> -t floppy
+```
