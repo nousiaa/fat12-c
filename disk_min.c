@@ -303,61 +303,55 @@ struct file_info_t load_file(struct disk_info_t *disk_info, struct dir_entry_t *
 {
     struct file_info_t file_info;
     uint32_t currentCluster = 0, file_offset = 0;
-    uint32_t lbaTmp;
     uint32_t dataTmp;
-    uint32_t segmentCount = 0, lastSegmentSize = 0;
-    struct data_target_t dataStruct = init_datastruct();
+    uint32_t segmentCount = 0, lastSegmentSize = 0, totalSegments = 0;
     file_info.data = init_datastruct();
-    dataStruct.data = NULL;
     copy_mem(&file_info.root_entry, selectedFile, sizeof(struct dir_entry_t));
 
-
     // get size from fat
-    currentCluster = selectedFile->start_cluster;
-    while (currentCluster != 0xFFF && currentCluster != 0x000)
-    {
-        lbaTmp = disk_info->disk_params.start_of_data_sector + (currentCluster-disk_info->disk_params.FAT_CLUSTER_OFFSET) * disk_info->param_block.sectors_per_cluster;
-        currentCluster = parse_fat12(disk_info->fat12_ptr, currentCluster);
+    for(
+        currentCluster = selectedFile->start_cluster;
+        currentCluster != 0xFFF && currentCluster != 0x000;
+        currentCluster = parse_fat12(disk_info->fat12_ptr, currentCluster)
+    ) {
         file_offset++;
     }
 
     file_info.malloc_size = file_offset * disk_info->param_block.sectors_per_cluster * disk_info->param_block.bytes_per_sector;
-    if(file_info.malloc_size < MAX_FAR_MALLOC_SIZE) {
+    totalSegments = (file_info.malloc_size / MAX_FAR_MALLOC_SIZE);
+    if(totalSegments<1) {
         file_info.data.data = malloc(file_info.malloc_size); 
         file_info.data.far_data_list[0].far_data = (uint8_t __far *)file_info.data.data;
         file_info.data.far_data_list[0].data_size = file_info.malloc_size;
     }
     if (!file_info.data.data) {
-        for(segmentCount = 0; segmentCount < (file_info.malloc_size/MAX_FAR_MALLOC_SIZE); segmentCount++) {
-            file_info.data.far_data_list[segmentCount].far_data = _fmalloc(MAX_FAR_MALLOC_SIZE);
-            file_info.data.far_data_list[segmentCount].data_size = MAX_FAR_MALLOC_SIZE;
+        for(segmentCount = 0; segmentCount <= totalSegments; segmentCount++) {
+            file_info.data.far_data_list[segmentCount].far_data = _fmalloc(
+                segmentCount < totalSegments ? MAX_FAR_MALLOC_SIZE : (file_info.malloc_size % MAX_FAR_MALLOC_SIZE)
+            );
+            file_info.data.far_data_list[segmentCount].data_size = segmentCount < totalSegments ? MAX_FAR_MALLOC_SIZE : (file_info.malloc_size % MAX_FAR_MALLOC_SIZE);
             if (!file_info.data.far_data_list[segmentCount].far_data) {
                 print_str("Failed malloc");
                 return file_info;
             }
         }
-
-        file_info.data.far_data_list[segmentCount].far_data = _fmalloc(file_info.malloc_size % MAX_FAR_MALLOC_SIZE);
-        file_info.data.far_data_list[segmentCount].data_size = file_info.malloc_size % MAX_FAR_MALLOC_SIZE;
-
-        if (!file_info.data.far_data_list[segmentCount].far_data) {
-            print_str("Failed malloc");
-            return file_info;
-        }
     }
 
     // Actually read the data
     file_offset = 0;
-    currentCluster = selectedFile->start_cluster;
-    while (currentCluster != 0xFFF && currentCluster != 0x000)
-    {
-        lbaTmp = disk_info->disk_params.start_of_data_sector + (currentCluster-disk_info->disk_params.FAT_CLUSTER_OFFSET) * disk_info->param_block.sectors_per_cluster;
-        
+    for(
+        currentCluster = selectedFile->start_cluster;
+        currentCluster != 0xFFF && currentCluster != 0x000;
+        currentCluster = parse_fat12(disk_info->fat12_ptr, currentCluster)
+    ) {
         dataTmp = (file_offset * disk_info->param_block.bytes_per_sector * disk_info->param_block.sectors_per_cluster);
-        dataStruct.far_data_list[dataTmp / MAX_FAR_MALLOC_SIZE].far_data = (uint8_t __far *)file_info.data.far_data_list[dataTmp / MAX_FAR_MALLOC_SIZE].far_data+ dataTmp % MAX_FAR_MALLOC_SIZE;
-        dataStruct.far_data_list[dataTmp / MAX_FAR_MALLOC_SIZE].data_size = file_info.data.far_data_list[dataTmp / MAX_FAR_MALLOC_SIZE].data_size;
-        get_data_from_disk(lbaTmp, disk_info->param_block.sectors_per_cluster, dataStruct.far_data_list[dataTmp / MAX_FAR_MALLOC_SIZE].far_data, DRIVE_ATTR_NONE, disk_info->drive_number);
-        currentCluster = parse_fat12(disk_info->fat12_ptr, currentCluster);
+        get_data_from_disk(
+            disk_info->disk_params.start_of_data_sector + (currentCluster-disk_info->disk_params.FAT_CLUSTER_OFFSET) * disk_info->param_block.sectors_per_cluster,
+            disk_info->param_block.sectors_per_cluster,
+            (uint8_t __far *)file_info.data.far_data_list[dataTmp / MAX_FAR_MALLOC_SIZE].far_data + dataTmp % MAX_FAR_MALLOC_SIZE,
+            DRIVE_ATTR_NONE,
+            disk_info->drive_number
+        );
         file_offset++;
     }
     return file_info;
