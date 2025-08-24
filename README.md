@@ -1,9 +1,17 @@
-# BASIC READ-ONLY FAT12 FILE SYSTEM IMPLEMENTATION in C
-This implementation provides basic functionality to read files from a FAT12 file system.
+# BASIC FAT12 FILE SYSTEM IMPLEMENTATION in C
+This implementation provides basic functionality to read and write files from a FAT12 file system.
+
+Currently supported:
+- READ
+- CREATE (PARTIALLY)
+
+TODO:
+- MODIFY
+- DELETE
 
 Should support files up to ~600kb in size
 
-It includes functions to read the BIOS Parameter Block (BPB), locate files, and read file data.
+It includes functions to read the BIOS Parameter Block (BPB), locate files, and read/write file data.
 
 The implementation is designed for educational purposes and may not cover all aspects of the FAT12 file system.
 
@@ -15,6 +23,8 @@ BUILD WITH openwatcom v2
 ```
 wcl -lr -mt prog.c
 ```
+
+write example can be found in write.c
 
 The program only looks at the first floppy drive (A:)
 
