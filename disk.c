@@ -793,9 +793,13 @@ void create_file(struct disk_info_t *disk_info, uint8_t *filename, uint8_t *data
 {
     struct file_info_t file;
     uint8_t filenameTmp[11];
-    parse_filename(filename, &filenameTmp, 0);
-    // TODO: ADD CHECK FOR FILE EXISTING ALREADY
 
+    if (select_file(disk_info, filename) != NULL) {
+        perror("File already exists.");
+        exit(EXIT_FAILURE);
+    }
+
+    parse_filename(filename, &filenameTmp, 0);
     file.data = init_datastruct();
     memset(&file.root_entry, 0, sizeof(file.root_entry));
     memcpy(file.root_entry.name, filenameTmp, 8);
