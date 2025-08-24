@@ -1,11 +1,11 @@
-# BASIC FAT12 FILE SYSTEM IMPLEMENTATION in C
-This implementation provides basic functionality to read and write files from a FAT12 file system.
+# Basic FAT12 fs implementation written in C
+Provides basic functionality to read and write files from a FAT12 file system.
 
 Currently supported:
 - READ
 - CREATE (PARTIALLY)
 
-TODO:
+Todo:
 - MODIFY
 - DELETE
 

@@ -1,14 +1,12 @@
 /**
- *  BASIC READ-ONLY FAT12 FILE SYSTEM IMPLEMENTATION
- *  This implementation provides basic functionality to read files from a FAT12 file system.
- *  It includes functions to read the BIOS Parameter Block (BPB), locate files, and read file data.
+ *  BASIC FAT12 FILE SYSTEM IMPLEMENTATION
+ *  This implementation provides basic functionality to read/write files from a FAT12 file system.
+ *  It includes functions to read the BIOS Parameter Block (BPB), locate files, and read/write file data.
  *  The implementation is designed for educational purposes and may not cover all aspects of the FAT12 file system.
  *  usage: prog 0-n<folder> 0-1<file>
  *  example: prog afolder anotherfolder readme.txt
  * 
  *  BUILD WITH openwatcom v2 - "wcl -lr -mt prog.c"
- *  NOTE: compiling with tiny memory mode fails when allocating memory for file data where data+code>64K
- *  NOTE2: did some far pointer fuckery to allow more memory to be allocated for file data
  */
 
 #include <i86.h>
