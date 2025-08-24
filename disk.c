@@ -448,35 +448,37 @@ void load_fat12(struct disk_info_t *disk_info)
     get_data_from_disk(disk_info->param_block.reserved_sectors, disk_info->disk_params.fat12_size_sectors/2, (uint8_t __far *)disk_info->fat12_ptr, DRIVE_ATTR_NONE, disk_info->drive_number);
 }
 
-struct dir_entry_t *select_file(struct disk_info_t *disk_info, uint8_t *filename)
+void parse_filename(uint8_t *filename, uint8_t *filenameTmp, uint8_t useDefaultExt)
 {
-    uint16_t dirEntryIndex, filenameCharIndex, extCharIndex;
-    uint8_t foundExt = 0;
-    uint8_t filenameTmp[8] = "        ";
-    uint8_t extTmp[3];
-    memcpy(extTmp, DEFAULT_EXT, 3);
-
+    uint16_t filenameCharIndex, extCharIndex;
+    memset(filenameTmp, ' ', 11);
+    if (useDefaultExt) {
+        memcpy(filenameTmp+8, DEFAULT_EXT, 3);
+    }
     for (filenameCharIndex = 0; filenameCharIndex < 8; filenameCharIndex++)
     {
         if (filename[filenameCharIndex] == ' ' || filename[filenameCharIndex] == '\0') {
             break;
         }
         if(filename[filenameCharIndex] == '.') {
-            foundExt = 1;
             filenameCharIndex++;
+            memset(filenameTmp+8, ' ', 3);
+            for (extCharIndex=0; extCharIndex < 3; extCharIndex++)
+            {
+                if (filename[extCharIndex + filenameCharIndex] == ' ' || filename[extCharIndex + filenameCharIndex] == '\0') break;
+                filenameTmp[extCharIndex + 8] = char2upper(filename[extCharIndex + filenameCharIndex]);
+            }
             break; 
         }
         filenameTmp[filenameCharIndex] = char2upper(filename[filenameCharIndex]);
     }
-    if(foundExt){
+}
 
-        for (extCharIndex=0; extCharIndex < 3; extCharIndex++)
-        {
-            if (filename[extCharIndex + filenameCharIndex] == ' ' || filename[extCharIndex + filenameCharIndex] == '\0') break;
-            extTmp[extCharIndex] = char2upper(filename[extCharIndex + filenameCharIndex]);
-        }
-    }
-
+struct dir_entry_t *select_file(struct disk_info_t *disk_info, uint8_t *filename)
+{
+    uint16_t dirEntryIndex;
+    uint8_t filenameTmp[11];
+    parse_filename(filename, &filenameTmp, 1);
 
     for (dirEntryIndex = 0; dirEntryIndex < disk_info->current_dir_entries_max; dirEntryIndex++)
     {
@@ -492,7 +494,7 @@ struct dir_entry_t *select_file(struct disk_info_t *disk_info, uint8_t *filename
         if (
             strncmp(disk_info->current_dir_ptr[dirEntryIndex].name, filenameTmp, 8) == 0 &&
             (
-                strncmp(disk_info->current_dir_ptr[dirEntryIndex].ext, extTmp, 3) == 0 ||
+                strncmp(disk_info->current_dir_ptr[dirEntryIndex].ext, filenameTmp+8, 3) == 0 ||
                 (disk_info->current_dir_ptr[dirEntryIndex].attr & FILE_DIRECTORY)
             )
         ) {
@@ -775,7 +777,9 @@ void write_file(struct disk_info_t *disk_info, struct file_info_t *file, uint8_t
     // write directory entry
     if(disk_info->current_dir_ptr == disk_info->root_dir_ptr) {
         save_root_dir(disk_info);
-        printf("LBA root dir %x\n", disk_info->disk_params.start_of_root_dir);
+        if (DEBUG) {
+            printf("LBA root dir %x\n", disk_info->disk_params.start_of_root_dir);
+        }
     } else {
         save_file_dir(disk_info);
     }
@@ -788,13 +792,14 @@ void write_file(struct disk_info_t *disk_info, struct file_info_t *file, uint8_t
 void create_file(struct disk_info_t *disk_info, uint8_t *filename, uint8_t *data)
 {
     struct file_info_t file;
-
+    uint8_t filenameTmp[11];
+    parse_filename(filename, &filenameTmp, 0);
     // TODO: ADD CHECK FOR FILE EXISTING ALREADY
 
     file.data = init_datastruct();
     memset(&file.root_entry, 0, sizeof(file.root_entry));
-    memcpy(file.root_entry.name, filename, 8);
-    memcpy(file.root_entry.ext, filename+8, 3);
+    memcpy(file.root_entry.name, filenameTmp, 8);
+    memcpy(file.root_entry.ext, filenameTmp+8, 3);
     file.root_entry.start_cluster = 0xFFFF; // value over 12 bits, so we know it is not a valid cluster in FAT12
     file.root_entry.file_size = strlen(data);
 

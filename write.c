@@ -14,11 +14,11 @@ void main(int argc, char *argv[])
 
     memset(buffer, 65, 1024);
     buffer[1023] = '\0';
-    strcpy(buffer, "Hello, FAT12!aaa");
-    strcpy(buffer+1000, "end of file test");
+    strcpy(buffer, "Hello, FAT12!abc");
+    strcpy(buffer+1000, "end of file test1");
     buffer[16] = 'A';
 
-    create_file(&disk_info, "FT13    TXT", buffer);
+    create_file(&disk_info, "wtest.txt", buffer);
     //unload_file(&fileDir);
     unload_disk_info(&disk_info);
     free(buffer);

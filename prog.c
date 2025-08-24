@@ -1,5 +1,5 @@
-#include "disk_min.c"
-//#include "disk.c"
+//#include "disk_min.c"
+#include "disk.c"
 
 void main(int argc, char *argv[])
 {
