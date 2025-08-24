@@ -250,7 +250,11 @@ void print_dir(struct disk_info_t *disk_info)
     print_str("Name\tExt\tSize\tCreated\t\tAttr\n");
     for(dir_print_index = 0; dir_print_index < dirEntries; dir_print_index++)
     {
-        if(dirToLookAt[dir_print_index].name[0] == 0 || dirToLookAt[dir_print_index].start_cluster == 0) continue; // skip empty entries
+        if(
+            dirToLookAt[dir_print_index].name[0] == 0 ||
+            dirToLookAt[dir_print_index].name[0] == 0xe5 ||
+            dirToLookAt[dir_print_index].start_cluster == 0
+        ) continue; // skip empty entries
         print_strn(dirToLookAt[dir_print_index].name, 11);
         print_str("\t");
         print_str(int_to_dec_str(dirToLookAt[dir_print_index].file_size));
@@ -429,7 +433,11 @@ struct dir_entry_t *select_file(struct disk_info_t *disk_info, uint8_t *filename
 
     for (dirEntryIndex = 0; dirEntryIndex < disk_info->current_dir_entries_max; dirEntryIndex++)
     {
-        if (disk_info->current_dir_ptr[dirEntryIndex].name[0] == 0 || disk_info->current_dir_ptr[dirEntryIndex].start_cluster == 0) continue;
+        if (
+            disk_info->current_dir_ptr[dirEntryIndex].name[0] == 0 ||
+            disk_info->current_dir_ptr[dirEntryIndex].name[0] == 0xe5 ||
+            disk_info->current_dir_ptr[dirEntryIndex].start_cluster == 0
+        ) continue;
 
         if (
             str_n_compare(disk_info->current_dir_ptr[dirEntryIndex].name, filenameTmp, 8) == 0 &&
