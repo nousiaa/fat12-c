@@ -270,7 +270,7 @@ void print_dir(struct disk_info_t *disk_info)
             dirToLookAt[dir_print_index].name[0] == 0xe5 ||
             dirToLookAt[dir_print_index].start_cluster == 0
         ) continue; // skip empty entries
-        if(!DEBUG) {
+        if(DEBUG) {
             flim = 0;
             printf("D: cluster %x\n", dirToLookAt[dir_print_index].start_cluster);
             for(fatChainDebug = dirToLookAt[dir_print_index].start_cluster; fatChainDebug < 0xFF0; fatChainDebug = parse_fat12(disk_info->fat12_ptr, fatChainDebug)) {
@@ -328,7 +328,9 @@ struct file_info_t load_file(struct disk_info_t *disk_info, struct dir_entry_t *
     uint32_t segmentCount = 0, lastSegmentSize = 0, totalSegments = 0;
     file_info.data = init_datastruct();
     memcpy(&file_info.root_entry, selectedFile, sizeof(struct dir_entry_t));
-    printf("START C; %x\n", selectedFile->start_cluster);
+    if(DEBUG) {
+        printf("load_file start_cluster: %x\n", selectedFile->start_cluster);
+    }
 
     // get size from fat as we cant trust size in root entry for directory entries
     for(
@@ -640,7 +642,9 @@ void reserve_fat12_clusters(struct disk_info_t *disk_info, uint16_t *fat_chain, 
     uint32_t i;
     for (i = 0; i < cluster_count; i++) {
         mark_fat12_cluster_used(disk_info->fat12_ptr, fat_chain[i], (i+1)<cluster_count ? fat_chain[i + 1] : 0xFFFF);
-        printf("Cluster %x allocated\n", fat_chain[i]);
+        if(DEBUG) {
+            printf("Cluster %x allocated\n", fat_chain[i]);
+        }
     }
 }
 void add_dir_entry(struct disk_info_t *disk_info, struct dir_entry_t *entry)
@@ -649,7 +653,9 @@ void add_dir_entry(struct disk_info_t *disk_info, struct dir_entry_t *entry)
     // Find a free cluster for the new directory entry
     for(i=0; i<disk_info->current_dir_entries_max - 1; i++) { // -1 as last record has to be 0 name
         if(disk_info->current_dir_ptr[i].name[0] == 0) {
-            printf("Directory entry added at index %d %.11s\n", i, disk_info->current_dir_ptr[i].name);
+            if(DEBUG) {
+                printf("Directory entry added at index %d %.11s\n", i, disk_info->current_dir_ptr[i].name);
+            }
             memcpy(&disk_info->current_dir_ptr[i], entry, sizeof(struct dir_entry_t));
             if(i+1<disk_info->current_dir_entries_max) {
                 disk_info->current_dir_ptr[i+1].name[0]= 0;
@@ -696,6 +702,37 @@ void save_file_data(struct disk_info_t *disk_info, struct file_info_t *file_info
         );
     }
 }
+uint16_t get_start_cluster_for_dir(struct disk_info_t *disk_info) {
+    uint32_t i;
+    for(i=0; i<disk_info->current_dir_entries_max; i++) {
+        if(strncmp(disk_info->current_dir_ptr[i].name, ".          ",11)==0) {
+            if(DEBUG) {
+                printf("start_cluster for dir %x: %.11s\n", disk_info->current_dir_ptr[i].start_cluster, disk_info->current_dir_ptr[i].name);
+            }
+
+            return disk_info->current_dir_ptr[i].start_cluster;
+        }
+    }
+    perror("Directory '.' not found.");
+    exit(EXIT_FAILURE);
+}
+
+void save_file_dir(struct disk_info_t *disk_info)
+{
+    uint16_t start_cluster = get_start_cluster_for_dir(disk_info);
+    uint16_t currentCluster, clusterCount = 0;
+
+    for(currentCluster = start_cluster; currentCluster != 0xFFF && currentCluster != 0x000; currentCluster = parse_fat12(disk_info->fat12_ptr, currentCluster)) {
+        write_data_to_disk(
+            disk_info->disk_params.start_of_data_sector + (currentCluster-disk_info->disk_params.FAT_CLUSTER_OFFSET) * disk_info->param_block.sectors_per_cluster,
+            disk_info->param_block.sectors_per_cluster,
+            (uint8_t __far *)disk_info->current_dir_ptr + clusterCount * disk_info->disk_params.bytes_in_cluster,
+            DRIVE_ATTR_NONE,
+            disk_info->drive_number
+        );
+        clusterCount++;
+    }
+}
 
 void write_file(struct disk_info_t *disk_info, struct file_info_t *file, uint8_t *data)
 {
@@ -703,11 +740,6 @@ void write_file(struct disk_info_t *disk_info, struct file_info_t *file, uint8_t
     uint32_t currentCluster = 0, foundClusters = 0;
     uint16_t *fat_chain = malloc(clusters_needed * sizeof(uint16_t));
     uint16_t i;
-
-    if(disk_info->current_dir_ptr != disk_info->root_dir_ptr) {
-        perror("Currently only writing to root directory is supported.");
-        exit(EXIT_FAILURE);
-    }
 
     if (file->root_entry.start_cluster != 0xFFFF) {
         perror("Only creating new files is supported currently.");
@@ -745,11 +777,7 @@ void write_file(struct disk_info_t *disk_info, struct file_info_t *file, uint8_t
         save_root_dir(disk_info);
         printf("LBA root dir %x\n", disk_info->disk_params.start_of_root_dir);
     } else {
-        for(i=0; i<disk_info->current_dir_entries_max; i++) {
-            if(strncmp(disk_info->current_dir_ptr[i].name, ".          ",11)==0) {
-                printf("start_cluster for dir %x: %.11s\n", disk_info->current_dir_ptr[i].start_cluster, disk_info->current_dir_ptr[i].name);
-            }
-        }
+        save_file_dir(disk_info);
     }
 
     // write file data
@@ -760,6 +788,9 @@ void write_file(struct disk_info_t *disk_info, struct file_info_t *file, uint8_t
 void create_file(struct disk_info_t *disk_info, uint8_t *filename, uint8_t *data)
 {
     struct file_info_t file;
+
+    // TODO: ADD CHECK FOR FILE EXISTING ALREADY
+
     file.data = init_datastruct();
     memset(&file.root_entry, 0, sizeof(file.root_entry));
     memcpy(file.root_entry.name, filename, 8);
